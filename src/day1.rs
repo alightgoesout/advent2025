@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::str::FromStr;
 
 use crate::input::{ParseExt, ReadLines};
@@ -5,19 +6,27 @@ use crate::{Error, Result, Solution, error};
 
 const INPUT: &[u8] = include_bytes!("../input/day1");
 
-pub struct Day1;
+#[derive(Default)]
+pub struct Day1(OnceCell<Vec<Instruction>>);
+
+impl Day1 {
+	fn instructions(&self) -> Result<&Vec<Instruction>> {
+		self.0.get_or_try_init(|| parse_instructions(INPUT))
+	}
+}
 
 impl Solution for Day1 {
 	fn part_one(&self) -> Result<String> {
-		let instructions = parse_instructions(INPUT)?;
-		let nb_stops_at_zero = execute_instructions_and_count_nb_stops_at_zero(&instructions);
+		let nb_stops_at_zero =
+			execute_instructions_and_count_nb_stops_at_zero(self.instructions()?);
 		Ok(format!(
 			"Number of times the dial stops at zero: {nb_stops_at_zero}"
 		))
 	}
 
 	fn part_two(&self) -> Result<String> {
-		todo!()
+		let nb_zero = execute_instructions_and_count_nb_zero(self.instructions()?);
+		Ok(format!("Number of times the dial passes zero: {nb_zero}"))
 	}
 }
 
@@ -79,6 +88,32 @@ fn execute_instructions_and_count_nb_stops_at_zero(instructions: &[Instruction])
 	nb_zero
 }
 
+fn execute_instructions_and_count_nb_zero(instructions: &[Instruction]) -> i32 {
+	let mut dial = 50;
+	let mut nb_zeros = 0;
+
+	for instruction in instructions {
+		match instruction.direction {
+			Direction::Left => {
+				nb_zeros += (dial - instruction.amount).div_euclid(100).abs();
+				if dial == 0 {
+					nb_zeros -= 1;
+				}
+				dial = (dial - instruction.amount).rem_euclid(100);
+				if dial == 0 {
+					nb_zeros += 1;
+				}
+			}
+			Direction::Right => {
+				nb_zeros += (dial + instruction.amount).div_euclid(100);
+				dial = (dial + instruction.amount).rem_euclid(100);
+			}
+		}
+	}
+
+	nb_zeros
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -123,5 +158,17 @@ L82
 			execute_instructions_and_count_nb_stops_at_zero(&instructions),
 			3,
 		);
+	}
+
+	#[test]
+	fn execute_instructions_and_count_nb_zero_should_return_6_for_example() {
+		let instructions = parse_instructions(EXAMPLE).unwrap();
+		assert_eq!(execute_instructions_and_count_nb_zero(&instructions), 6);
+	}
+
+	#[test]
+	fn execute_instructions_and_count_nb_zero_should_return_2_for_l50_r101() {
+		let instructions = vec![Instruction::new(Left, 50), Instruction::new(Right, 101)];
+		assert_eq!(execute_instructions_and_count_nb_zero(&instructions), 2);
 	}
 }
