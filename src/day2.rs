@@ -1,28 +1,43 @@
+use std::cell::OnceCell;
 use std::ops::RangeInclusive;
 
 use crate::{Result, Solution, error};
 
 const INPUT: &str = include_str!("../input/day2");
 
-pub struct Day2;
+#[derive(Default)]
+pub struct Day2(OnceCell<Vec<RangeInclusive<u64>>>);
 
-impl Solution for Day2 {
-	fn part_one(&self) -> crate::Result<String> {
-		let instruction_ranges = parse_instruction_ranges(INPUT)?;
-		let sum_of_invalid_ids: u64 = find_invalid_ids(&instruction_ranges).sum();
-		Ok(format!("Sum of invalid ids: {sum_of_invalid_ids}"))
-	}
-
-	fn part_two(&self) -> crate::Result<String> {
-		todo!()
+impl Day2 {
+	fn instruction_ranges(&self) -> Result<&Vec<RangeInclusive<u64>>> {
+		self.0.get_or_try_init(|| parse_instruction_ranges(INPUT))
 	}
 }
 
-fn find_invalid_ids(id_ranges: &[RangeInclusive<u64>]) -> impl Iterator<Item = u64> {
+impl Solution for Day2 {
+	fn part_one(&self) -> Result<String> {
+		let sum_of_invalid_ids: u64 = find_invalid_ids_part1(self.instruction_ranges()?).sum();
+		Ok(format!("Sum of invalid ids: {sum_of_invalid_ids}"))
+	}
+
+	fn part_two(&self) -> Result<String> {
+		let sum_of_invalid_ids: u64 = find_invalid_ids_part2(self.instruction_ranges()?).sum();
+		Ok(format!("Sum of invalid ids: {sum_of_invalid_ids}"))
+	}
+}
+
+fn find_invalid_ids_part1(id_ranges: &[RangeInclusive<u64>]) -> impl Iterator<Item = u64> {
 	id_ranges
 		.iter()
 		.flat_map(|range| range.clone())
-		.filter(|id| !is_valid_id(*id))
+		.filter(|id| !is_valid_id_part1(*id))
+}
+
+fn find_invalid_ids_part2(id_ranges: &[RangeInclusive<u64>]) -> impl Iterator<Item = u64> {
+	id_ranges
+		.iter()
+		.flat_map(|range| range.clone())
+		.filter(|id| !is_valid_id_part2(*id))
 }
 
 fn parse_instruction_ranges(input: &str) -> Result<Vec<RangeInclusive<u64>>> {
@@ -36,19 +51,35 @@ fn parse_instruction_range(range: &str) -> Result<RangeInclusive<u64>> {
 	Ok(start.parse()?..=end.parse()?)
 }
 
-fn is_valid_id(id: u64) -> bool {
+fn is_valid_id_part1(id: u64) -> bool {
 	let id_as_string = id.to_string();
 	let digits = id_as_string.as_bytes();
-	let id_length = digits.len();
-	if !id_length.is_multiple_of(2) {
-		return true;
-	}
-	for i in 0..(id_length / 2) {
-		if digits[i] != digits[i + id_length / 2] {
-			return true;
+	!digits.len().is_multiple_of(2) || !has_repeated_pattern(digits, digits.len() / 2)
+}
+
+fn is_valid_id_part2(id: u64) -> bool {
+	let id_as_string = id.to_string();
+	let digits = id_as_string.as_bytes();
+	for size in 1..=(digits.len() - 1) {
+		if has_repeated_pattern(digits, size) {
+			return false;
 		}
 	}
-	false
+	true
+}
+
+fn has_repeated_pattern(digits: &[u8], size: usize) -> bool {
+	if !digits.len().is_multiple_of(size) {
+		return false;
+	}
+	for i in 0..size {
+		for j in 1..(digits.len() / size) {
+			if digits[i] != digits[i + j * size] {
+				return false;
+			}
+		}
+	}
+	true
 }
 
 #[cfg(test)]
@@ -80,36 +111,95 @@ mod test {
 	}
 
 	#[test]
-	fn is_valid_id_should_return_true_for_1() {
-		assert!(is_valid_id(1))
+	fn is_valid_id_part1_should_return_true_for_1() {
+		assert!(is_valid_id_part1(1))
 	}
 
 	#[test]
-	fn is_valid_id_should_return_false_for_11() {
-		assert!(!is_valid_id(11))
+	fn is_valid_id_part1_should_return_false_for_11() {
+		assert!(!is_valid_id_part1(11))
 	}
 
 	#[test]
-	fn is_valid_id_should_return_true_for_101() {
-		assert!(is_valid_id(101))
+	fn is_valid_id_part1_should_return_true_for_101() {
+		assert!(is_valid_id_part1(101))
 	}
 
 	#[test]
-	fn is_valid_id_should_return_false_for_6464() {
-		assert!(!is_valid_id(6464))
+	fn is_valid_id_part1_should_return_true_for_111() {
+		assert!(is_valid_id_part1(111))
 	}
 
 	#[test]
-	fn is_valid_id_should_return_false_for_123123() {
-		assert!(!is_valid_id(123123))
+	fn is_valid_id_part1_should_return_true_for_1011() {
+		assert!(is_valid_id_part1(1011))
 	}
 
 	#[test]
-	fn sum_of_invalid_ids_for_example_should_be_1227775554() {
+	fn is_valid_id_part1_should_return_true_for_1110() {
+		assert!(is_valid_id_part1(1110))
+	}
+
+	#[test]
+	fn is_valid_id_part1_should_return_false_for_6464() {
+		assert!(!is_valid_id_part1(6464))
+	}
+
+	#[test]
+	fn is_valid_id_part1_should_return_false_for_123123() {
+		assert!(!is_valid_id_part1(123123))
+	}
+
+	#[test]
+	fn sum_of_invalid_ids_part1_for_example_should_be_1227775554() {
 		let instruction_ranges = parse_instruction_ranges(EXAMPLE).unwrap();
 		assert_eq!(
-			find_invalid_ids(&instruction_ranges).sum::<u64>(),
+			find_invalid_ids_part1(&instruction_ranges).sum::<u64>(),
 			1227775554,
+		);
+	}
+
+	#[test]
+	fn is_valid_id_part2_should_return_true_for_1() {
+		assert!(is_valid_id_part2(1))
+	}
+
+	#[test]
+	fn is_valid_id_part2_should_return_false_for_11() {
+		assert!(!is_valid_id_part2(11))
+	}
+
+	#[test]
+	fn is_valid_id_part2_should_return_true_for_101() {
+		assert!(is_valid_id_part2(101))
+	}
+
+	#[test]
+	fn is_valid_id_part2_should_return_false_for_6464() {
+		assert!(!is_valid_id_part2(6464))
+	}
+
+	#[test]
+	fn is_valid_id_part2_should_return_false_for_123123123() {
+		assert!(!is_valid_id_part2(123123123))
+	}
+
+	#[test]
+	fn is_valid_id_part2_should_return_false_for_1212121212() {
+		assert!(!is_valid_id_part2(1212121212))
+	}
+
+	#[test]
+	fn is_valid_id_part2_should_return_false_for_1111111() {
+		assert!(!is_valid_id_part2(1111111))
+	}
+
+	#[test]
+	fn sum_of_invalid_ids_part2_for_example_should_be_4174379265() {
+		let instruction_ranges = parse_instruction_ranges(EXAMPLE).unwrap();
+		assert_eq!(
+			find_invalid_ids_part2(&instruction_ranges).sum::<u64>(),
+			4174379265,
 		);
 	}
 }
