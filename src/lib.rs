@@ -2,6 +2,7 @@
 
 mod day1;
 mod day2;
+mod day3;
 mod error;
 mod input;
 mod solution;
@@ -15,5 +16,6 @@ pub fn solutions() -> Vec<Box<dyn Solution>> {
 	vec![
 		Box::new(day1::Day1::default()),
 		Box::new(day2::Day2::default()),
+		Box::new(day3::Day3),
 	]
 }
