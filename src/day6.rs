@@ -11,13 +11,15 @@ pub struct Day6;
 
 impl Solution for Day6 {
 	fn part_one(&self) -> Result<String> {
-		let problems = parse_problems(INPUT)?;
+		let problems = parse_problems_part1(INPUT)?;
 		let sum_of_all_answers = sum_of_all_problem_answers(&problems);
 		Ok(format!("Sum of all answers: {sum_of_all_answers}"))
 	}
 
 	fn part_two(&self) -> Result<String> {
-		todo!()
+		let problems = parse_problems_part2(INPUT)?;
+		let sum_of_all_answers = sum_of_all_problem_answers(&problems);
+		Ok(format!("Sum of all answers: {sum_of_all_answers}"))
 	}
 }
 
@@ -25,8 +27,9 @@ fn sum_of_all_problem_answers(problems: &[Problem]) -> u64 {
 	problems.iter().map(Problem::evaluate).sum()
 }
 
-fn parse_problems(input: &[u8]) -> Result<Vec<Problem>> {
-	static SEPARATOR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
+static SEPARATOR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
+
+fn parse_problems_part1(input: &[u8]) -> Result<Vec<Problem>> {
 	let lines: Vec<_> = input.read_lines().collect();
 	let (operators, operand_lines) = lines.split_last().ok_or_else(|| error!("Empty input"))?;
 
@@ -53,6 +56,44 @@ fn parse_problems(input: &[u8]) -> Result<Vec<Problem>> {
 			operands: operand_lines.iter().map(|line| line[i]).collect(),
 		})
 		.collect())
+}
+
+fn parse_problems_part2(input: &[u8]) -> Result<Vec<Problem>> {
+	let lines: Vec<_> = input.read_lines().collect();
+	let (operators, operand_lines) = lines.split_last().ok_or_else(|| error!("Empty input"))?;
+
+	let operators = SEPARATOR
+		.split(operators)
+		.map(|operator| operator.parse::<Operator>())
+		.collect::<Result<Vec<_>>>()?;
+
+	let mut index = 0;
+	operators
+		.into_iter()
+		.map(|operator| {
+			let operands = parse_operands(operand_lines, &mut index)?;
+			Ok(Problem { operator, operands })
+		})
+		.collect()
+}
+
+fn parse_operands(operand_lines: &[String], index: &mut usize) -> Result<Vec<u64>> {
+	let mut operands = Vec::new();
+
+	while *index < operand_lines[0].len() {
+		let digits: String = operand_lines
+			.iter()
+			.map(|line| line.as_bytes()[*index] as char)
+			.collect();
+		*index += 1;
+		let operand = digits.trim();
+		if operand.is_empty() {
+			break;
+		}
+		operands.push(operand.parse()?);
+	}
+
+	Ok(operands)
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -93,15 +134,15 @@ mod test {
 	use super::*;
 
 	const EXAMPLE: &[u8] = b"\
-123 328  51 64
- 45 64  387 23
+123 328  51 64 
+ 45 64  387 23 
   6 98  215 314
 *   +   *   +
 ";
 
 	#[test]
-	fn parse_example() {
-		let problems = parse_problems(EXAMPLE).unwrap();
+	fn parse_example_part1() {
+		let problems = parse_problems_part1(EXAMPLE).unwrap();
 
 		assert_eq!(
 			problems,
@@ -115,10 +156,32 @@ mod test {
 	}
 
 	#[test]
-	fn sum_of_all_problem_answers_example() {
-		let problems = parse_problems(EXAMPLE).unwrap();
+	fn sum_of_all_problem_answers_example_part1() {
+		let problems = parse_problems_part1(EXAMPLE).unwrap();
 
 		assert_eq!(sum_of_all_problem_answers(&problems), 4277556);
+	}
+
+	#[test]
+	fn parse_example_part2() {
+		let problems = parse_problems_part2(EXAMPLE).unwrap();
+
+		assert_eq!(
+			problems,
+			vec![
+				multiply!(1, 24, 356),
+				add!(369, 248, 8),
+				multiply!(32, 581, 175),
+				add!(623, 431, 4),
+			],
+		);
+	}
+
+	#[test]
+	fn sum_of_all_problem_answers_example_part2() {
+		let problems = parse_problems_part2(EXAMPLE).unwrap();
+
+		assert_eq!(sum_of_all_problem_answers(&problems), 3263827);
 	}
 
 	macro_rules! add {
