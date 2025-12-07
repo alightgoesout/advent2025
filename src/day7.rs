@@ -1,21 +1,29 @@
-use std::collections::HashSet;
+use std::cell::OnceCell;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 use crate::{Error, Result, Solution};
 
 const INPUT: &str = include_str!("../input/day7");
 
-pub struct Day7;
+#[derive(Default)]
+pub struct Day7(OnceCell<Diagram<141, 142>>);
+
+impl Day7 {
+	fn diagram(&self) -> Result<&Diagram<141, 142>> {
+		self.0.get_or_try_init(|| INPUT.parse())
+	}
+}
 
 impl Solution for Day7 {
 	fn part_one(&self) -> Result<String> {
-		let diagram: Diagram<141, 142> = INPUT.parse()?;
-		let splits = diagram.count_splits();
+		let splits = self.diagram()?.count_splits();
 		Ok(format!("Number of splits: {splits}"))
 	}
 
 	fn part_two(&self) -> Result<String> {
-		todo!()
+		let timelines = self.diagram()?.count_timelines();
+		Ok(format!("Number of timelines: {timelines}"))
 	}
 }
 
@@ -51,6 +59,34 @@ impl<const M: usize, const N: usize> Diagram<M, N> {
 		}
 
 		splits
+	}
+
+	fn count_timelines(&self) -> usize {
+		let mut beams = HashMap::from([(self.start, 1)]);
+
+		for row in 0..(M - 1) {
+			let mut new_beams = HashMap::new();
+			for (column, timelines) in beams {
+				if self.spaces[row + 1][column] == Space::Splitter {
+					new_beams
+						.entry(column - 1)
+						.and_modify(|t| *t += timelines)
+						.or_insert(timelines);
+					new_beams
+						.entry(column + 1)
+						.and_modify(|t| *t += timelines)
+						.or_insert(timelines);
+				} else {
+					new_beams
+						.entry(column)
+						.and_modify(|t| *t += timelines)
+						.or_insert(timelines);
+				}
+			}
+			beams = new_beams;
+		}
+
+		beams.values().sum()
 	}
 }
 
@@ -183,5 +219,11 @@ mod test {
 	fn diagram_count_splits_example() {
 		let diagram: Diagram<15, 16> = EXAMPLE.parse().unwrap();
 		assert_eq!(diagram.count_splits(), 21);
+	}
+
+	#[test]
+	fn diagram_count_timelines_example() {
+		let diagram: Diagram<15, 16> = EXAMPLE.parse().unwrap();
+		assert_eq!(diagram.count_timelines(), 40);
 	}
 }
