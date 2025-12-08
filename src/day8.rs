@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
 use std::str::FromStr;
@@ -7,13 +8,21 @@ use crate::{Error, Result, Solution, error};
 
 const INPUT: &[u8] = include_bytes!("../input/day8");
 
-pub struct Day8;
+#[derive(Default)]
+pub struct Day8(OnceCell<BinaryHeap<Arc>>);
+
+impl Day8 {
+	fn arcs(&self) -> Result<&BinaryHeap<Arc>> {
+		self.0.get_or_try_init(|| {
+			let positions = parse_positions(INPUT)?;
+			Ok(compute_arcs(&positions))
+		})
+	}
+}
 
 impl Solution for Day8 {
 	fn part_one(&self) -> Result<String> {
-		let positions = parse_positions(INPUT)?;
-		let arcs = compute_arcs(&positions);
-		let (a, b, c) = connect_junction_boxes(arcs, 1000)?;
+		let (a, b, c) = connect_junction_boxes(self.arcs()?.clone(), 1000)?;
 		Ok(format!(
 			"Product of the three largest circuits' sizes: {}",
 			a * b * c
@@ -21,7 +30,11 @@ impl Solution for Day8 {
 	}
 
 	fn part_two(&self) -> Result<String> {
-		todo!()
+		let (first, second) = connect_all_junction_boxes(self.arcs()?.clone(), 1000)?;
+		Ok(format!(
+			"Product of the X coordinates of the last two connected boxes: {}",
+			first.x * second.x
+		))
 	}
 }
 
@@ -69,6 +82,23 @@ fn extract_circuit(
 		.iter()
 		.position(|circuit| circuit.contains(position))
 		.map(|index| circuits.remove(index))
+}
+
+fn connect_all_junction_boxes(
+	mut arcs: BinaryHeap<Arc>,
+	nb_boxes: usize,
+) -> Result<(Position, Position)> {
+	let mut circuit = HashSet::new();
+
+	while let Some(Arc { first, second, .. }) = arcs.pop() {
+		circuit.insert(first);
+		circuit.insert(second);
+		if circuit.len() == nb_boxes {
+			return Ok((first, second));
+		}
+	}
+
+	Err(error!("Could not connect all boxes"))
 }
 
 fn compute_arcs(positions: &[Position]) -> BinaryHeap<Arc> {
@@ -243,5 +273,18 @@ mod test {
 		let result = connect_junction_boxes(arcs, 10).unwrap();
 
 		assert_eq!(result, (5, 4, 2))
+	}
+
+	#[test]
+	fn connect_all_junction_boxes_example() {
+		let positions = parse_positions(EXAMPLE).unwrap();
+		let arcs = compute_arcs(&positions);
+
+		let result = connect_all_junction_boxes(arcs, positions.len()).unwrap();
+
+		assert_eq!(
+			result,
+			(Position::new(216, 146, 977), Position::new(117, 168, 530)),
+		)
 	}
 }
