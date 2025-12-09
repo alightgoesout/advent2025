@@ -2,6 +2,12 @@
 name = "advent2025"
 version = "0.1.0"
 edition = "2024"
+default-run = "advent2025"
 
 [dependencies]
+itertools = "0.14.0"
+plotters = "0.3.7"
 regex = "1.12.2"
+
+[[bin]]
+name = "day9"

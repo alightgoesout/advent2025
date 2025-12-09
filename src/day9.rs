@@ -1,22 +1,38 @@
+use itertools::Itertools;
+use std::cell::OnceCell;
 use std::str::FromStr;
 
 use crate::error::error;
 use crate::input::{ParseExt, ReadLines};
 use crate::{Error, Result, Solution};
 
-const INPUT: &[u8] = include_bytes!("../input/day9");
+pub const INPUT: &[u8] = include_bytes!("../input/day9");
 
-pub struct Day9;
+#[derive(Default)]
+pub struct Day9(OnceCell<Vec<Tile>>);
+
+impl Day9 {
+	fn tiles(&self) -> Result<&Vec<Tile>> {
+		self.0.get_or_try_init(|| parse_tiles(INPUT))
+	}
+}
 
 impl Solution for Day9 {
 	fn part_one(&self) -> Result<String> {
-		let tiles = parse_tiles(INPUT)?;
-		let largest_rectangle_area = find_largest_rectangle_area(&tiles);
+		let largest_rectangle_area = find_largest_rectangle_area(self.tiles()?);
 		Ok(format!("Largest rectangle area: {largest_rectangle_area}"))
 	}
 
 	fn part_two(&self) -> Result<String> {
-		todo!()
+		let largest_red_and_green_rectangle =
+			find_largest_red_and_green_rectangle(self.tiles()?)
+				.ok_or_else(|| error!("Could not find any rectangle"))?;
+		Ok(format!(
+			"Largest red and green rectangle : {:?} {:?} (area: {})",
+			largest_red_and_green_rectangle.top_left,
+			largest_red_and_green_rectangle.bottom_right,
+			largest_red_and_green_rectangle.area(),
+		))
 	}
 }
 
@@ -32,14 +48,38 @@ fn find_largest_rectangle_area(tiles: &[Tile]) -> u64 {
 	largest_rectangle_area
 }
 
-fn parse_tiles(input: &[u8]) -> Result<Vec<Tile>> {
+fn find_largest_red_and_green_rectangle(tiles: &[Tile]) -> Option<Rectangle> {
+	let segments = compute_segments(tiles);
+	tiles
+		.iter()
+		.cartesian_product(tiles)
+		.map(Rectangle::from)
+		.sorted_by_key(Rectangle::area)
+		.rev()
+		.find(|rectangle| {
+			segments
+				.iter()
+				.all(|segment| !segment.intersects(rectangle))
+		})
+}
+
+fn compute_segments(tiles: &[Tile]) -> Vec<Segment> {
+	tiles
+		.iter()
+		.chain(vec![&tiles[0]])
+		.tuple_windows()
+		.map(|(first, second)| Segment::new(first, second))
+		.collect::<Vec<_>>()
+}
+
+pub fn parse_tiles(input: &[u8]) -> Result<Vec<Tile>> {
 	input.read_lines().parse().collect()
 }
 
-#[derive(Debug, Eq, PartialEq)]
-struct Tile {
-	x: u64,
-	y: u64,
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub struct Tile {
+	pub x: u64,
+	pub y: u64,
 }
 
 impl Tile {
@@ -60,6 +100,58 @@ impl FromStr for Tile {
 			.split_once(',')
 			.ok_or_else(|| error!("Invalid tile {s}"))?;
 		Ok(Self::new(x.parse()?, y.parse()?))
+	}
+}
+
+struct Segment {
+	start: Tile,
+	end: Tile,
+}
+
+impl Segment {
+	fn new(first: &Tile, second: &Tile) -> Self {
+		if first.x == second.x {
+			Self {
+				start: Tile::new(first.x, first.y.min(second.y)),
+				end: Tile::new(first.x, first.y.max(second.y)),
+			}
+		} else {
+			Self {
+				start: Tile::new(first.x.min(second.x), first.y),
+				end: Tile::new(first.x.max(second.x), first.y),
+			}
+		}
+	}
+
+	fn intersects(&self, rectangle: &Rectangle) -> bool {
+		self.start.x < rectangle.bottom_right.x
+			&& self.start.y < rectangle.bottom_right.y
+			&& self.end.x > rectangle.top_left.x
+			&& self.end.y > rectangle.top_left.y
+	}
+}
+
+struct Rectangle {
+	top_left: Tile,
+	bottom_right: Tile,
+}
+
+impl Rectangle {
+	fn new(first: &Tile, second: &Tile) -> Self {
+		Self {
+			top_left: Tile::new(first.x.min(second.x), first.y.min(second.y)),
+			bottom_right: Tile::new(first.x.max(second.x), first.y.max(second.y)),
+		}
+	}
+
+	fn area(&self) -> u64 {
+		self.top_left.rectangle_area(&self.bottom_right)
+	}
+}
+
+impl From<(&Tile, &Tile)> for Rectangle {
+	fn from((first, second): (&Tile, &Tile)) -> Self {
+		Self::new(first, second)
 	}
 }
 
@@ -108,5 +200,12 @@ mod test {
 	fn find_largest_rectangle_area_should_return_50_for_example() {
 		let tiles = parse_tiles(EXAMPLE).unwrap();
 		assert_eq!(find_largest_rectangle_area(&tiles), 50);
+	}
+
+	#[test]
+	fn find_largest_red_and_green_rectangle_should_return_24_for_example() {
+		let tiles = parse_tiles(EXAMPLE).unwrap();
+		let rectangle = find_largest_red_and_green_rectangle(&tiles).unwrap();
+		assert_eq!(rectangle.area(), 24);
 	}
 }
