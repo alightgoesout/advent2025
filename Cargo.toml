@@ -8,6 +8,7 @@ default-run = "advent2025"
 itertools = "0.14.0"
 plotters = "0.3.7"
 regex = "1.12.2"
+winnow = "0.7.14"
 
 [[bin]]
 name = "day9"
