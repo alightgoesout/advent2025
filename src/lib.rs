@@ -3,6 +3,7 @@ extern crate core;
 
 mod day1;
 mod day10;
+mod day11;
 mod day2;
 mod day3;
 mod day4;
@@ -32,5 +33,6 @@ pub fn solutions() -> Vec<Box<dyn Solution>> {
 		Box::new(day8::Day8::default()),
 		Box::new(day9::Day9::default()),
 		Box::new(day10::Day10::default()),
+		Box::new(day11::Day11),
 	]
 }
